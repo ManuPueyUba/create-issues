@@ -83,6 +83,9 @@ def parse_readme(file_path):
         content = f.read()
 
     priorities = parse_priorities(content)
+    # "<!-- Fuente: IT QBN -->" al principio del archivo: de dónde salen sus historias (opcional)
+    source_match = re.search(r"<!-- Fuente: (.*?) -->", content)
+    source = source_match.group(1).strip() if source_match else None
     issues = []
     current_epic = None
 
@@ -92,7 +95,7 @@ def parse_readme(file_path):
 
     def flush():
         if title:
-            issues.append(process_issue(title, buffer, current_epic, priorities))
+            issues.append(process_issue(title, buffer, current_epic, priorities, source))
 
     for line in lines:
         # Cualquier "## " cierra la historia en curso
@@ -160,7 +163,7 @@ def format_body(content, epic, status, priority):
     return "\n\n".join(filter(None, [table, " · ".join(refs), "---", content]))
 
 
-def process_issue(title, buffer, epic, priorities):
+def process_issue(title, buffer, epic, priorities, source=None):
     content = "\n".join(buffer)
 
     # Status
@@ -178,6 +181,8 @@ def process_issue(title, buffer, epic, priorities):
         labels.append(priority)
     if epic:
         labels.append(f"épica: {epic}")
+    if source:
+        labels.append(f"fuente: {source}")
 
     body = format_body(content, epic, status,
                        priority.split(": ", 1)[1].capitalize() if priority else None)
@@ -209,6 +214,8 @@ def ensure_labels(issues):
     wanted = dict(FIXED_LABELS)
     for n, epic in enumerate(epics):
         wanted[epic] = (EPIC_COLORS[n % len(EPIC_COLORS)], "")
+    for source in {l for i in issues for l in i["labels"] if l.startswith("fuente: ")}:
+        wanted[source] = ("000000", "De dónde salió la historia")
 
     used = {l for i in issues for l in i["labels"]}
     for name, (color, description) in wanted.items():
